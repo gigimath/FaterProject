@@ -35,14 +35,6 @@ def preprocessing(df, product_number):
     # df.set_index('Week Number', inplace=True)
     return df_fin
 
-"""
-def first_order_diff(dataset):
-    STU_diff = np.dataset['Standard Units per Week']
-    dataset['Standard Units per Week_diff'] = np.diff(dataset['Standard Units per Week'])
-    dataset = dataset.dropna()
-    return dataset  
-    
-"""
 
 def stationarity_test(df, differenced):
     """
@@ -58,7 +50,7 @@ def stationarity_test(df, differenced):
         print(f'ADF Statistic: {result[0]}')
         print(f'p-value: {result[1]}')
         if result[1] <= 0.05:
-            print("Evidence against the null-hypothesis")
+            print("Evidence against the null-hypothesis, series look stationary!")
         else:
             print("Weak evidence against the null-hypothesis, showing that the series is likely to be non-stationary")
     else:
@@ -80,6 +72,7 @@ def differencing(df):
 
 def seasonal_differencing(df):
     """ Differencing at first order in case of seasonality """
+
     df['Sales after differencing'] = df['STU'] - df['STU'].shift(12)
     return df
 
@@ -92,7 +85,7 @@ def plotting_data(dataframe):
 dataset = pd.read_excel(r"C:\Users\Enrico\Google Drive\DATA MINING\CHALLENGE FATER\serie_tamponi.xlsx")
 df = dataset.copy()                     # Copy the original dataset in a new identical one
 
-df_clean = preprocessing(df, 3)
+df_clean = preprocessing(df, 3)         # Choose the product number
 print(df_clean.head())
 stationarity_test(df_clean, differenced=False)                  # Stationarity test before differencing
 
@@ -111,3 +104,8 @@ plotting_data(df_clean)         # Plotting the series after differencing
 plot_acf(df_clean.STU)
 plt.show()
 """
+
+
+
+
+# def ARIMA_model()
