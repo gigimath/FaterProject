@@ -40,14 +40,53 @@ def first_order_diff(dataset):
     STU_diff = np.dataset['Standard Units per Week']
     dataset['Standard Units per Week_diff'] = np.diff(dataset['Standard Units per Week'])
     dataset = dataset.dropna()
-    return dataset
+    return dataset  
     
 """
 
-def stationarity_test(df):
-    result = adfuller(df.STU.dropna())
-    print(f'ADF Statistic: {result[0]}')
-    print(f'p-value: {result[1]}')
+def stationarity_test(df, differenced):
+    """
+    We are going to perform Augmented Dicker-Fuller Test.
+    It works as an hypothesis test, with
+    H0 = Series is stationary
+    H1 = Series is not stationary
+    result of ADF-Test are ['ADF Statistics', 'p-value', '#Lags Used', 'Number of observations used']
+    """
+    if differenced:
+
+        result = adfuller(df['Sales after differencing'])
+        print(f'ADF Statistic: {result[0]}')
+        print(f'p-value: {result[1]}')
+        if result[1] <= 0.05:
+            print("Evidence against the null-hypothesis")
+        else:
+            print("Weak evidence against the null-hypothesis, showing that the series is likely to be non-stationary")
+    else:
+        result = adfuller(df['STU'])
+        print(f'ADF Statistic: {result[0]}')
+        print(f'p-value: {result[1]}')
+        if result[1] <= 0.05:
+            print("Evidence against the null-hypothesis, series look stationary!")
+        else:
+            print("Weak evidence against the null-hypothesis, showing that the series is likely to be non-stationary!")
+
+
+def differencing(df):
+    """ Differencing at first order """
+
+    df['Sales after differencing'] = df['STU'] - df['STU'].shift(1)
+    return df
+
+
+def seasonal_differencing(df):
+    """ Differencing at first order in case of seasonality """
+    df['Sales after differencing'] = df['STU'] - df['STU'].shift(12)
+    return df
+
+
+def plotting_data(dataframe):
+    plt.plot(dataframe['Sales after differencing'])
+    plt.show()
 
 
 dataset = pd.read_excel(r"C:\Users\Enrico\Google Drive\DATA MINING\CHALLENGE FATER\serie_tamponi.xlsx")
@@ -55,10 +94,20 @@ df = dataset.copy()                     # Copy the original dataset in a new ide
 
 df_clean = preprocessing(df, 3)
 print(df_clean.head())
-stationarity_test(df_clean)
+stationarity_test(df_clean, differenced=False)                  # Stationarity test before differencing
 
-plt.plot(df_clean['Week'], df_clean['STU'])
-plt.show()
+df_clean = differencing(df_clean)
+# df_clean = seasonal_differencing(df_clean)    # If data are seasonal
+print(df_clean.head())
 
+stationarity_test(df_clean.dropna(), differenced=True)          # Stationarity test after differencing
+
+plotting_data(df_clean)         # Plotting the series after differencing
+
+
+# plt.plot(df_clean['Week', 'Sales after differencing'].dropna())
+# plt.show()
+"""
 plot_acf(df_clean.STU)
 plt.show()
+"""
