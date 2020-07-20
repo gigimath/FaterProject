@@ -3,8 +3,8 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import adfuller
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf, acf
+from statsmodels.tsa.arima_model import ARIMA
 
 def df_filtered_product(dataframe, prod_num):
     df_prod = dataframe[dataframe['Products'] == 'Product ' + str(prod_num)]
@@ -82,30 +82,66 @@ def plotting_data(dataframe):
     plt.show()
 
 
+def plotting_autocorr(dataframe):
+    plot_acf(dataframe['Sales after differencing'].iloc[1:], lags=40)
+    plt.show()
+
+
+def plotting_part_autocorr(dataframe):
+    plot_pacf(dataframe['Sales after differencing'].iloc[1:], lags=40)
+    plt.show()
+
+
+def splitting_df(dataframe):
+    dataframe = dataframe.dropna()
+    dataframe = dataframe.drop('STU', axis=1)
+    # dataframe = dataframe.reset_index()
+    train_set = dataframe.iloc[:87]
+    test_set = dataframe.iloc[87:]
+    print(train_set)
+    print(test_set)
+    return train_set, test_set
+
+
+# -------- STARTING MAIN -----------
 dataset = pd.read_excel(r"C:\Users\Enrico\Google Drive\DATA MINING\CHALLENGE FATER\serie_tamponi.xlsx")
 df = dataset.copy()                     # Copy the original dataset in a new identical one
 
 df_clean = preprocessing(df, 3)         # Choose the product number
-print(df_clean.head())
+
+
 stationarity_test(df_clean, differenced=False)                  # Stationarity test before differencing
 
 df_clean = differencing(df_clean)
 # df_clean = seasonal_differencing(df_clean)    # If data are seasonal
-print(df_clean.head())
+
+
+
 
 stationarity_test(df_clean.dropna(), differenced=True)          # Stationarity test after differencing
 
 plotting_data(df_clean)         # Plotting the series after differencing
 
 
-# plt.plot(df_clean['Week', 'Sales after differencing'].dropna())
-# plt.show()
-"""
-plot_acf(df_clean.STU)
+plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
+plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
+# plot_pacf(df_clean)
+
+training_set, test_set = splitting_df(df_clean)
+
+model = ARIMA(training_set, order=(2,1,1))
+#model = ARIMA(df_clean['Sales after differencing'].dropna(), order=(2,1,1))
+model_fit = model.fit()
+
+print(model_fit.summary())
+df_clean['Forecast'] = model_fit.predict(start=80, typ='levels', dynamic=True)
+df_clean[['Sales after differencing', 'Forecast']].plot(figsize=(12,8))
 plt.show()
-"""
 
 
-
-
-# def ARIMA_model()
+residuals = pd.DataFrame(model_fit.resid)
+residuals.plot()
+plt.show()
+residuals.plot(kind='kde')
+plt.show()
+print(residuals.describe())
