@@ -106,6 +106,40 @@ def splitting_df(dataframe):
     return train_set, test_set, dataframe
 
 
+def rolling_forecast_ARIMA(train, test):
+    test = list(test['STU'])
+    history = [x for x in train['STU']]
+    predictions = []
+    for t in range(len(test)):
+        model = ARIMA(history, order=(3, 1, 1))
+        model_fit = model.fit(disp=0)  # Avoid printing ARIMA stats
+        output = model_fit.forecast()
+        yhat = output[0]
+        predictions.append(yhat)
+        obs = test[t]
+        history.append(obs)
+        print(f"predicted: {yhat} -- observed: {obs}")
+    error = mean_squared_error(test, predictions)
+    print(f"Test MSE: {error}")
+    plt.plot(test)
+    plt.plot(predictions, color="red")
+    plt.show()
+
+
+def ARIMA_predictions(train, test):
+    test = list(test['STU'])
+    history = [x for x in train['STU']]
+    model = ARIMA(history, order=(3, 1, 2))
+    model_fit = model.fit(disp=0)
+    predictions = model_fit.predict(end=16, typ='linear')           # End must be the length of test-set
+    for i in range(len(predictions)):
+        print(f"predicted: {predictions[i]}, observed: {test[i]}")
+    print(f"MSE: {mean_squared_error(test, predictions)}")
+    plt.plot(test)
+    plt.plot(predictions, color="red")
+    plt.show()
+
+
 # -------- STARTING MAIN -----------
 dataset = pd.read_excel(r"C:\Users\Enrico\Google Drive\DATA MINING\CHALLENGE FATER\serie_tamponi.xlsx")
 df = dataset.copy()                     # Copy the original dataset in a new identical one
@@ -127,45 +161,27 @@ plotting_data(df_clean)         # Plotting the series after differencing
 
 plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
 plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
-# plot_pacf(df_clean)
+
 training_set, test_set, df_clean = splitting_df(df_clean)
 
-history = [x for x in training_set['STU']]
-test_set = list(test_set['STU'])
-#predictions = []
 print(df_clean)
-model = ARIMA(history, order=(3, 1, 2))
-model_fit = model.fit(disp=0)
-predictions = model_fit.predict(end=16, typ='linear')
-print(len(predictions), len(test_set))
-for i in range(len(predictions)):
-    print(f"predicted: {predictions[i]}, observed: {test_set[i]}")
-print(f"MSE: {mean_squared_error(test_set, predictions)}")
+print(training_set)
+print(test_set)
 
-"""
-for t in range(len(test_set)):
-    model = ARIMA(history, order=(3, 0, 1))
-    model_fit = model.fit(disp=0)                   # Avoid printing ARIMA stats
-    output = model_fit.forecast()
-    yhat = output[0]
-    predictions.append(yhat)
-    obs = test_set[t]
-    history.append(obs)
-    print(f"predicted: {yhat} -- observed: {obs}")
-"""
-#error = mean_squared_error(test_set, predictions)
-#print(f"Test MSE: {error}")
 
-plt.plot(test_set)
-plt.plot(predictions, color="red")
-plt.show()
+rolling_forecast_ARIMA(training_set, test_set)
+ARIMA_predictions(training_set, test_set)
+
+
+
+
+
 
 
 
 
 
 """
-
 model = ARIMA(training_set, order=(2,1,1))
 #model = ARIMA(df_clean['Sales after differencing'].dropna(), order=(2,1,1))
 model_fit = model.fit()
