@@ -48,7 +48,7 @@ def stationarity_test(df, differenced):
     """
     if differenced:
 
-        result = adfuller(df['Sales after differencing'])
+        result = adfuller(df['STU'])
         print(f'ADF Statistic: {result[0]}')
         print(f'p-value: {result[1]}')
         if result[1] <= 0.05:
@@ -70,41 +70,40 @@ def stationarity_test(df, differenced):
 def differencing(df):
     """ Differencing at first order """
 
-    df['Sales after differencing'] = df['STU'] - df['STU'].shift(1)
+    df['STU'] = df['STU'] - df['STU'].shift(1)
     return df
 
 
 def seasonal_differencing(df):
     """ Differencing at first order in case of seasonality """
 
-    df['Sales after differencing'] = df['STU'] - df['STU'].shift(12)
+    df['STU'] = df['STU'] - df['STU'].shift(12)
     return df
 
 
 def plotting_data(dataframe):
-    plt.plot(dataframe['Sales after differencing'])
+    plt.plot(dataframe['STU'])
     plt.show()
 
 
 def plotting_autocorr(dataframe):
-    plot_acf(dataframe['Sales after differencing'].iloc[1:], lags=40)
+    plot_acf(dataframe['STU'].iloc[1:], lags=40)
     plt.show()
 
 
 def plotting_part_autocorr(dataframe):
-    plot_pacf(dataframe['Sales after differencing'].iloc[1:], lags=40)
+    plot_pacf(dataframe['STU'].iloc[1:], lags=40)
     plt.show()
 
 
 def splitting_df(dataframe):
     dataframe = dataframe.dropna()
-    dataframe = dataframe.drop('STU', axis=1)
     # dataframe = dataframe.reset_index()
-    train_set = dataframe.iloc[:105]
-    test_set = dataframe.iloc[105:]
-    #print(train_set)
-    #print(test_set)
-    return train_set, test_set
+    train_set = dataframe.iloc[:100]
+    test_set = dataframe.iloc[100:]
+    print(train_set)
+    print(test_set)
+    return train_set, test_set, dataframe
 
 
 # -------- STARTING MAIN -----------
@@ -129,16 +128,23 @@ plotting_data(df_clean)         # Plotting the series after differencing
 plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
 plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
 # plot_pacf(df_clean)
+training_set, test_set, df_clean = splitting_df(df_clean)
 
-training_set, test_set = splitting_df(df_clean)
+history = [x for x in training_set['STU']]
+test_set = list(test_set['STU'])
+#predictions = []
+print(df_clean)
+model = ARIMA(history, order=(3, 1, 2))
+model_fit = model.fit(disp=0)
+predictions = model_fit.predict(end=16, typ='linear')
+print(len(predictions), len(test_set))
+for i in range(len(predictions)):
+    print(f"predicted: {predictions[i]}, observed: {test_set[i]}")
+print(f"MSE: {mean_squared_error(test_set, predictions)}")
 
-history = [x for x in training_set['Sales after differencing']]
-test_set = list(test_set['Sales after differencing'])
-predictions = []
-
-
+"""
 for t in range(len(test_set)):
-    model = ARIMA(history, order=(4, 1, 1))
+    model = ARIMA(history, order=(3, 0, 1))
     model_fit = model.fit(disp=0)                   # Avoid printing ARIMA stats
     output = model_fit.forecast()
     yhat = output[0]
@@ -146,9 +152,9 @@ for t in range(len(test_set)):
     obs = test_set[t]
     history.append(obs)
     print(f"predicted: {yhat} -- observed: {obs}")
-
-error = mean_squared_error(test_set, predictions)
-print(f"Test MSE: {error}")
+"""
+#error = mean_squared_error(test_set, predictions)
+#print(f"Test MSE: {error}")
 
 plt.plot(test_set)
 plt.plot(predictions, color="red")
