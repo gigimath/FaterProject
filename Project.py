@@ -99,8 +99,8 @@ def plotting_part_autocorr(dataframe):
 def splitting_df(dataframe):
     dataframe = dataframe.dropna()
     # dataframe = dataframe.reset_index()
-    train_set = dataframe.iloc[:100]
-    test_set = dataframe.iloc[100:]
+    train_set = dataframe.iloc[:110]
+    test_set = dataframe.iloc[110:]
     print(train_set)
     print(test_set)
     return train_set, test_set, dataframe
@@ -111,7 +111,7 @@ def rolling_forecast_ARIMA(train, test):
     history = [x for x in train['STU']]
     predictions = []
     for t in range(len(test)):
-        model = ARIMA(history, order=(3, 1, 1))
+        model = ARIMA(history, order=(2, 1, 1))
         model_fit = model.fit(disp=0)  # Avoid printing ARIMA stats
         output = model_fit.forecast()
         yhat = output[0]
@@ -131,7 +131,7 @@ def ARIMA_predictions(train, test):
     history = [x for x in train['STU']]
     model = ARIMA(history, order=(3, 1, 2))
     model_fit = model.fit(disp=0)
-    predictions = model_fit.predict(end=16, typ='linear')           # End must be the length of test-set
+    predictions = model_fit.predict(end=6, typ='linear')           # End must be the length of test-set
     for i in range(len(predictions)):
         print(f"predicted: {predictions[i]}, observed: {test[i]}")
     print(f"MSE: {mean_squared_error(test, predictions)}")
@@ -171,13 +171,6 @@ print(test_set)
 
 rolling_forecast_ARIMA(training_set, test_set)
 ARIMA_predictions(training_set, test_set)
-
-
-
-
-
-
-
 
 
 
