@@ -4,7 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf, acf
-from statsmodels.tsa.arima_model import ARIMA
+from statsmodels.tsa.arima_model import ARIMA, ARMAResults
+from sklearn.metrics import mean_squared_error
+
 
 def df_filtered_product(dataframe, prod_num):
     df_prod = dataframe[dataframe['Products'] == 'Product ' + str(prod_num)]
@@ -38,7 +40,7 @@ def preprocessing(df, product_number):
 
 def stationarity_test(df, differenced):
     """
-    We are going to perform Augmented Dicker-Fuller Test.
+    We are going to perform Augmented Dickey-Fuller Test.
     It works as an hypothesis test, with
     H0 = Series is stationary
     H1 = Series is not stationary
@@ -59,8 +61,10 @@ def stationarity_test(df, differenced):
         print(f'p-value: {result[1]}')
         if result[1] <= 0.05:
             print("Evidence against the null-hypothesis, series look stationary!")
+            return True
         else:
             print("Weak evidence against the null-hypothesis, showing that the series is likely to be non-stationary!")
+            return False
 
 
 def differencing(df):
@@ -96,10 +100,10 @@ def splitting_df(dataframe):
     dataframe = dataframe.dropna()
     dataframe = dataframe.drop('STU', axis=1)
     # dataframe = dataframe.reset_index()
-    train_set = dataframe.iloc[:87]
-    test_set = dataframe.iloc[87:]
-    print(train_set)
-    print(test_set)
+    train_set = dataframe.iloc[:105]
+    test_set = dataframe.iloc[105:]
+    #print(train_set)
+    #print(test_set)
     return train_set, test_set
 
 
@@ -110,15 +114,14 @@ df = dataset.copy()                     # Copy the original dataset in a new ide
 df_clean = preprocessing(df, 3)         # Choose the product number
 
 
-stationarity_test(df_clean, differenced=False)                  # Stationarity test before differencing
+if not stationarity_test(df_clean, differenced=False):                  # Stationarity test before differencing
+    df_clean = differencing(df_clean)
+    stationarity_test(df_clean.dropna(), differenced=True)  # Stationarity test after differencing
 
-df_clean = differencing(df_clean)
 # df_clean = seasonal_differencing(df_clean)    # If data are seasonal
 
 
 
-
-stationarity_test(df_clean.dropna(), differenced=True)          # Stationarity test after differencing
 
 plotting_data(df_clean)         # Plotting the series after differencing
 
@@ -129,6 +132,34 @@ plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
 
 training_set, test_set = splitting_df(df_clean)
 
+history = [x for x in training_set['Sales after differencing']]
+test_set = list(test_set['Sales after differencing'])
+predictions = []
+
+
+for t in range(len(test_set)):
+    model = ARIMA(history, order=(4, 1, 1))
+    model_fit = model.fit(disp=0)                   # Avoid printing ARIMA stats
+    output = model_fit.forecast()
+    yhat = output[0]
+    predictions.append(yhat)
+    obs = test_set[t]
+    history.append(obs)
+    print(f"predicted: {yhat} -- observed: {obs}")
+
+error = mean_squared_error(test_set, predictions)
+print(f"Test MSE: {error}")
+
+plt.plot(test_set)
+plt.plot(predictions, color="red")
+plt.show()
+
+
+
+
+
+"""
+
 model = ARIMA(training_set, order=(2,1,1))
 #model = ARIMA(df_clean['Sales after differencing'].dropna(), order=(2,1,1))
 model_fit = model.fit()
@@ -137,11 +168,13 @@ print(model_fit.summary())
 df_clean['Forecast'] = model_fit.predict(start=80, typ='levels', dynamic=True)
 df_clean[['Sales after differencing', 'Forecast']].plot(figsize=(12,8))
 plt.show()
+"""
 
-
+"""
 residuals = pd.DataFrame(model_fit.resid)
 residuals.plot()
 plt.show()
 residuals.plot(kind='kde')
 plt.show()
 print(residuals.describe())
+"""
