@@ -126,18 +126,14 @@ def rolling_forecast_ARIMA(train, test):
     plt.show()
 
 
-def ARIMA_predictions(train, test):
-    test = list(test['STU'])
-    history = [x for x in train['STU']]
-    model = ARIMA(history, order=(3, 1, 2))
+def ARIMA_predictions(sales):
+    model = ARIMA(sales, order=(1, 1, 0))
     model_fit = model.fit(disp=0)
-    predictions = model_fit.predict(end=6, typ='linear')           # End must be the length of test-set
-    for i in range(len(predictions)):
-        print(f"predicted: {predictions[i]}, observed: {test[i]}")
-    print(f"MSE: {mean_squared_error(test, predictions)}")
-    plt.plot(test)
+    predictions = model_fit.predict(start=90, end=116, typ='linear', dynamic=True)           # End must be the length of test-set
+    plt.plot(sales)
     plt.plot(predictions, color="red")
     plt.show()
+    print(f"Test MSE: {mean_squared_error(predictions, sales[89:])}")
 
 
 # -------- STARTING MAIN -----------
@@ -170,7 +166,7 @@ print(test_set)
 
 
 rolling_forecast_ARIMA(training_set, test_set)
-ARIMA_predictions(training_set, test_set)
+ARIMA_predictions(df_clean['STU'])
 
 
 
