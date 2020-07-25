@@ -147,8 +147,8 @@ def best_prediction(train, test, differenced, prod_num):
         d = 1
     else:
         d = 0
-    for q in range(5):
-        for p in range(5):
+    for q in range(7):
+        for p in range(7):
             # print(f"p_value: {p}, q_value: {q}")
             try:
                 MSE = rolling_forecast_ARIMA(train, test, p, d, q)
