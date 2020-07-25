@@ -99,31 +99,32 @@ def plotting_part_autocorr(dataframe):
 def splitting_df(dataframe):
     dataframe = dataframe.dropna()
     # dataframe = dataframe.reset_index()
-    train_set = dataframe.iloc[:110]
-    test_set = dataframe.iloc[110:]
+    train_set = dataframe.iloc[:90]
+    test_set = dataframe.iloc[90:]
     print(train_set)
     print(test_set)
     return train_set, test_set, dataframe
 
 
-def rolling_forecast_ARIMA(train, test):
+def rolling_forecast_ARIMA(train, test, p, d, q):
     test = list(test['STU'])
     history = [x for x in train['STU']]
     predictions = []
     for t in range(len(test)):
-        model = ARIMA(history, order=(2, 1, 1))
+        model = ARIMA(history, order=(p, d, q))
         model_fit = model.fit(disp=0)  # Avoid printing ARIMA stats
         output = model_fit.forecast()
         yhat = output[0]
         predictions.append(yhat)
         obs = test[t]
         history.append(obs)
-        print(f"predicted: {yhat} -- observed: {obs}")
+        #print(f"predicted: {yhat} -- observed: {obs}")
     error = mean_squared_error(test, predictions)
-    print(f"Test MSE: {error}")
-    plt.plot(test)
-    plt.plot(predictions, color="red")
-    plt.show()
+    return error
+    # print(f"Test MSE: {error}")
+    # plt.plot(test)
+    # plt.plot(predictions, color="red")
+    # plt.show()
 
 
 def ARIMA_predictions(sales):
@@ -136,37 +137,60 @@ def ARIMA_predictions(sales):
     print(f"Test MSE: {mean_squared_error(predictions, sales[89:])}")
 
 
+
+def best_prediction(train, test, differenced, prod_num):
+    MSE_target = 100000
+    best_MSE = 0
+    p_value = 0
+    q_value = 0
+    if differenced:
+        d = 1
+    else:
+        d = 0
+    for q in range(5):
+        for p in range(5):
+            # print(f"p_value: {p}, q_value: {q}")
+            try:
+                MSE = rolling_forecast_ARIMA(train, test, p, d, q)
+                if MSE < MSE_target:
+                    p_value = p
+                    q_value = q
+                    best_MSE = MSE
+                print(f"p_value: {p}, q_value: {q}, Test MSE: {MSE}")
+            except:
+                pass
+    return f"Fitting an ARIMA model for Product n°{prod_num} with\n{p_value} as AR(p)\n{q_value} as MA(q)\nTest MSE = {best_MSE}"
+
+
 # -------- STARTING MAIN -----------
 dataset = pd.read_excel(r"C:\Users\Enrico\Google Drive\DATA MINING\CHALLENGE FATER\serie_tamponi.xlsx")
 df = dataset.copy()                     # Copy the original dataset in a new identical one
 
-df_clean = preprocessing(df, 3)         # Choose the product number
+
+for product in range(1, 8):
+    df_clean = preprocessing(df, product)         # Choose the product number
+    diff = False
+
+    if not stationarity_test(df_clean, differenced=False):      # Stationarity test before differencing
+        df_clean = differencing(df_clean)
+        diff = True
+        stationarity_test(df_clean.dropna(), differenced=True)  # Stationarity test after differencing
 
 
-if not stationarity_test(df_clean, differenced=False):                  # Stationarity test before differencing
-    df_clean = differencing(df_clean)
-    stationarity_test(df_clean.dropna(), differenced=True)  # Stationarity test after differencing
 
-# df_clean = seasonal_differencing(df_clean)    # If data are seasonal
+    plotting_data(df_clean)         # Plotting the series after differencing
 
 
+    plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
+    plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
 
+    training_set, test_set, df_clean = splitting_df(df_clean)
 
-plotting_data(df_clean)         # Plotting the series after differencing
-
-
-plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
-plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
-
-training_set, test_set, df_clean = splitting_df(df_clean)
-
-print(df_clean)
-print(training_set)
-print(test_set)
-
-
-rolling_forecast_ARIMA(training_set, test_set)
-ARIMA_predictions(df_clean['STU'])
+    print(df_clean)
+    print(training_set)
+    print(test_set)
+    print(best_prediction(training_set, test_set, diff, product))
+#ARIMA_predictions(df_clean['STU'])
 
 
 
