@@ -1,10 +1,14 @@
 import pandas as pd
-import numpy as np
+import pmdarima as pm
+import warnings
+warnings.filterwarnings("ignore")
+import xlsxwriter
+
 
 import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import adfuller
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf, acf
-from statsmodels.tsa.arima_model import ARIMA, ARMAResults
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.arima_model import ARIMA
 from sklearn.metrics import mean_squared_error
 
 
@@ -15,6 +19,7 @@ def df_filtered_product(dataframe, prod_num):
 
 def preprocessing(df, product_number):
     useless_columns = ['Customers', 'Category', 'Segment', 'Regione', 'Provincia', 'Channel']
+    df = df.drop(df[df.Provincia == '**'].index)             # Removing 'Estero'
     for column in useless_columns:
         df = df.drop(column, axis=1)
     df = df_filtered_product(df, product_number)             # Choose the number of the product
@@ -34,7 +39,8 @@ def preprocessing(df, product_number):
                 index += 1
         sales.append([date_range[week*7], STU])
     df_fin = pd.DataFrame(sales, columns=['Week', 'STU'])
-    # df.set_index('Week Number', inplace=True)
+    df_fin.Week = pd.to_datetime(df_fin.Week)
+    df_fin.set_index('Week', inplace=True)
     return df_fin
 
 
@@ -67,20 +73,6 @@ def stationarity_test(df, differenced):
             return False
 
 
-def differencing(df):
-    """ Differencing at first order """
-
-    df['STU'] = df['STU'] - df['STU'].shift(1)
-    return df
-
-
-def seasonal_differencing(df):
-    """ Differencing at first order in case of seasonality """
-
-    df['STU'] = df['STU'] - df['STU'].shift(12)
-    return df
-
-
 def plotting_data(dataframe):
     plt.plot(dataframe['STU'])
     plt.show()
@@ -99,10 +91,11 @@ def plotting_part_autocorr(dataframe):
 def splitting_df(dataframe):
     dataframe = dataframe.dropna()
     # dataframe = dataframe.reset_index()
-    train_set = dataframe.iloc[:90]
-    test_set = dataframe.iloc[90:]
-    print(train_set)
-    print(test_set)
+    index = 100
+    train_set = dataframe.iloc[:index]
+    test_set = dataframe.iloc[index:]
+    #print(train_set)
+    #print(test_set)
     return train_set, test_set, dataframe
 
 
@@ -127,6 +120,46 @@ def rolling_forecast_ARIMA(train, test, p, d, q):
     # plt.show()
 
 
+def forecast_ARIMA(train, test, p, d, q, model_selection, prod_num):
+    #history = [x for x in train['STU']]
+    #test_set = [x for x in test['STU']]
+    model = ARIMA(train['STU'].dropna(), order=(p, d, q))
+    model_fit = model.fit(disp=0)
+    if model_selection:
+        forecast, st_errs, conf_int = model_fit.forecast(len(test), alpha=0.05)
+        forecast_series = pd.Series(forecast, index=test.index)
+    else:
+        predictions_range = pd.date_range('2019-04-01', '2019-09-29', freq="W-MON").to_series()
+
+        df_predictions = pd.DataFrame(predictions_range, columns=["Week"])
+
+        forecast, st_errs, conf_int = model_fit.forecast(26, alpha=0.05)
+        df_predictions['Sales_Prediction'] = forecast
+        df_predictions['Week'] = pd.to_datetime(df_predictions["Week"])
+        df_predictions.set_index("Week", inplace=True)
+        #print(df_predictions)
+
+        plt.figure(figsize=(12, 5))
+        plt.plot(train['STU'], label='training')
+        plt.plot(df_predictions['Sales_Prediction'], label='forecast')
+        plt.title('Forecast vs Actuals')
+        plt.legend(loc='upper left', fontsize=8)
+        plt.savefig("Product" + f"_{prod_num}" + ".pdf")
+
+
+    """plt.figure(figsize=(12, 5), dpi=100)
+    plt.plot(train['STU'], label='training')
+    plt.plot(test['STU'], label='actual')
+    plt.plot(forecast_series, label='forecast')
+    plt.title('Forecast vs Actuals')
+    plt.legend(loc='upper left', fontsize=8)
+    plt.show()"""
+    if model_selection:
+        MSE = mean_squared_error(test, forecast)
+        return MSE
+    return df_predictions
+
+
 def ARIMA_predictions(sales):
     model = ARIMA(sales, order=(1, 1, 0))
     model_fit = model.fit(disp=0)
@@ -137,29 +170,48 @@ def ARIMA_predictions(sales):
     print(f"Test MSE: {mean_squared_error(predictions, sales[89:])}")
 
 
+def ARIMA_model_selection(value):
+    model = pm.auto_arima(value, start_p=1, start_q=1,
+                          test='adf',  # use adftest to find optimal 'd'
+                          max_p=3, max_q=3,  # maximum p and q
+                          m=1,  # frequency of series
+                          d=None,  # let model determine 'd'
+                          seasonal=False,  # No Seasonality
+                          start_P=0,
+                          D=0,
+                          trace=True,
+                          error_action='ignore',
+                          suppress_warnings=True,
+                          stepwise=True)
+    print(model.summary())
+
 
 def best_prediction(train, test, differenced, prod_num):
-    MSE_target = 100000
-    best_MSE = 0
+    MSE_target = 500000
+    best_MSE = MSE_target
     p_value = 0
     q_value = 0
     if differenced:
-        d = 1
+        d_value = 1
     else:
-        d = 0
+        d_value = 0
     for q in range(7):
         for p in range(7):
             # print(f"p_value: {p}, q_value: {q}")
             try:
-                MSE = rolling_forecast_ARIMA(train, test, p, d, q)
-                if MSE < MSE_target:
+                mod_sel = True
+                MSE = forecast_ARIMA(train, test, p, d_value, q, mod_sel, prod_num)
+                if MSE < best_MSE:
                     p_value = p
                     q_value = q
                     best_MSE = MSE
-                print(f"p_value: {p}, q_value: {q}, Test MSE: {MSE}")
+                #print(f"p_value: {p}, q_value: {q}, Test MSE: {MSE}")
             except:
                 pass
-    return f"Fitting an ARIMA model for Product n°{prod_num} with\n{p_value} as AR(p)\n{q_value} as MA(q)\nTest MSE = {best_MSE}"
+    #if best_MSE == MSE_target:
+    #    return f"No ARIMA model able to obtain less than 100000 for MSE"
+    print(f"Fitting an ARIMA model for Product n°{prod_num} with\n{p_value} as AR(p)\n{q_value} as MA(q)\n{d_value} as I(d)\nTest MSE = {best_MSE}")
+    return p_value, q_value, d_value
 
 
 # -------- STARTING MAIN -----------
@@ -167,30 +219,53 @@ dataset = pd.read_excel(r"C:\Users\Enrico\Google Drive\DATA MINING\CHALLENGE FAT
 df = dataset.copy()                     # Copy the original dataset in a new identical one
 
 
-for product in range(1, 8):
+for product in range(1, 23):
     df_clean = preprocessing(df, product)         # Choose the product number
+
     diff = False
 
     if not stationarity_test(df_clean, differenced=False):      # Stationarity test before differencing
-        df_clean = differencing(df_clean)
+        #df_clean = differencing(df_clean)
         diff = True
-        stationarity_test(df_clean.dropna(), differenced=True)  # Stationarity test after differencing
+        #stationarity_test(df_clean.dropna(), differenced=True)  # Stationarity test after differencing"""
 
 
 
-    plotting_data(df_clean)         # Plotting the series after differencing
+    #plotting_data(df_clean)         # Plotting the series after differencing
 
 
-    plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
-    plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
+    #plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
+    #plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
 
     training_set, test_set, df_clean = splitting_df(df_clean)
 
-    print(df_clean)
-    print(training_set)
-    print(test_set)
-    print(best_prediction(training_set, test_set, diff, product))
+    #print(df_clean.head(), df_clean.info())
+    #print(training_set.tail(), training_set.info())
+    #print(test_set.tail(), test_set.info())
+    #forecast_ARIMA(training_set, test_set, 1, 0, 1)
+    #ARIMA_model_selection(df_clean['STU'])
+
+    p, q, d = best_prediction(training_set, test_set, diff, product)
+
+    try:
+        predictions = forecast_ARIMA(df_clean, test_set, p, d, q, False, product)
+        predictions.to_excel("Product" + f"_{product}" + ".xlsx")
+    except:
+        print("Unable to do forecast, some Error raised!")
+        pass
+
+
+
 #ARIMA_predictions(df_clean['STU'])
+
+
+
+
+
+
+
+
+
 
 
 
