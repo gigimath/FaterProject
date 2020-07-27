@@ -12,11 +12,17 @@ from sklearn.metrics import mean_squared_error
 
 
 def df_filtered_product(dataframe, prod_num):
+    """
+    Filter all dataset for a certain product
+    """
     df_prod = dataframe[dataframe['Products'] == 'Product ' + str(prod_num)]
     return df_prod
 
 
 def preprocessing(df, product_number):
+    """
+    Cleaning data grouping values by product per week. Removing 'Estero' and creating the data structure for ARIMA model
+    """
     useless_columns = ['Customers', 'Category', 'Segment', 'Regione', 'Provincia', 'Channel']
     df = df.drop(df[df.Provincia == '**'].index)             # Removing 'Estero'
     for column in useless_columns:
@@ -72,12 +78,10 @@ def stationarity_test(df, differenced):
             return False
 
 
-def plotting_data(dataframe):
-    plt.plot(dataframe['STU'])
-    plt.show()
-
-
 def plotting(dataframe, prod_num):
+    """
+    Plotting time series and differenced time series for each product
+    """
     fig, axs = plt.subplots(2, sharex=True)
     axs[0].plot(dataframe['STU'])
     axs[1].plot(dataframe['STU'].diff().dropna())
@@ -87,26 +91,37 @@ def plotting(dataframe, prod_num):
 
 
 def plotting_autocorr(dataframe):
+    """
+    Plotting autocorrelation for data in order to find q for MA(q) at sight
+    """
     plot_acf(dataframe['STU'].iloc[1:], lags=40)
     plt.show()
 
 
 def plotting_part_autocorr(dataframe):
+    """
+    Plotting partial autocorrelation for data in order to find p for AR(p) at sight
+    """
     plot_pacf(dataframe['STU'].iloc[1:], lags=40)
     plt.show()
 
 
 def splitting_df(dataframe):
+    """
+    Splitting dataframe into training and test set for selecting the model
+    """
     dataframe = dataframe.dropna()
     index = 100
     train_set = dataframe.iloc[:index]
     test_set = dataframe.iloc[index:]
-    #print(train_set)
-    #print(test_set)
     return train_set, test_set, dataframe
 
 
 def rolling_forecast_ARIMA(train, test, p, d, q):
+    """
+    Rolling forecast ARIMA is a way to perform ARIMA forecast for (n+1) element given n elements of training set.
+    After that, it takes one element from test set and add it to training set stepwise.
+    """
     test = list(test['STU'])
     history = [x for x in train['STU']]
     predictions = []
@@ -123,8 +138,9 @@ def rolling_forecast_ARIMA(train, test, p, d, q):
 
 
 def forecast_ARIMA(train, test, p, d, q, model_selection, prod_num):
-    #history = [x for x in train['STU']]
-    #test_set = [x for x in test['STU']]
+    """
+    Make predictions with ARIMA model, and plotting both training set and forecast, or training set and test set in case of model selection
+    """
     model = ARIMA(train['STU'].dropna(), order=(p, d, q))
     model_fit = model.fit(disp=0)
     if model_selection:
@@ -139,7 +155,6 @@ def forecast_ARIMA(train, test, p, d, q, model_selection, prod_num):
         df_predictions['Week'] = pd.to_datetime(df_predictions["Week"])
         df_predictions.set_index("Week", inplace=True)
 
-
         plt.figure(figsize=(12, 5))
         plt.plot(train['STU'], label='training')
         plt.plot(df_predictions['Sales_Prediction'], label='forecast')
@@ -153,6 +168,10 @@ def forecast_ARIMA(train, test, p, d, q, model_selection, prod_num):
 
 
 def ARIMA_model_selection(value):
+    """
+    For a more accurate forecast, auto_arima function within pmdarima is provided but not used for our porpouse.
+    auto_arima function is able to select the best tuning parameters for ARIMA model, according to BIC and AIC.
+    """
     model = pm.auto_arima(value, start_p=1, start_q=1,
                           test='adf',  # use adftest to find optimal 'd'
                           max_p=3, max_q=3,  # maximum p and q
@@ -169,7 +188,10 @@ def ARIMA_model_selection(value):
 
 
 def best_prediction(train, test, differenced, prod_num):
-    MSE_target = 500000
+    """
+    This function tests all possible parameters for ARIMA model for each product, and returns the tuning parameters that minimize MSE
+    """
+    MSE_target = 500000                 # Choosing a wide MSE in order to include all possible results
     best_MSE = MSE_target
     p_value = 0
     q_value = 0
@@ -189,30 +211,25 @@ def best_prediction(train, test, differenced, prod_num):
                     best_MSE = MSE
             except:
                 pass
-    #if best_MSE == MSE_target:
-    #    return f"No ARIMA model able to obtain less than 100000 for MSE"
     print(f"Fitting an ARIMA model for Product n°{prod_num} with\n{p_value} as AR(p)\n{q_value} as MA(q)\n{d_value} as I(d)\nTest MSE = {best_MSE}")
     return p_value, q_value, d_value
 
 
 # -------- STARTING MAIN -----------
-dataset = pd.read_excel("serie_tamponi.xlsx")
-df = dataset.copy()                     # Copy the original dataset in a new identical one
+dataset = pd.read_excel("serie_tamponi.xlsx")       # Loading data
+df = dataset.copy()                                 # Copy the original dataset in a new identical one
 
 
-for product in range(1, 23):
-    df_clean = preprocessing(df, product)         # Choose the product number
+for product in range(1, 23):                        # Iterate over all products
+    df_clean = preprocessing(df, product)
 
     diff = False
 
     if not stationarity_test(df_clean, differenced=False):      # Stationarity test before differencing
-        diff = True
-        #stationarity_test(df_clean.dropna(), differenced=True)  # Stationarity test after differencing"""
+        diff = True                                             # Time series must be stationary
 
-
-
-    #plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
-    #plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
+    # plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
+    # plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
 
     training_set, test_set, df_clean = splitting_df(df_clean)
     plotting(df_clean, product)
@@ -225,5 +242,3 @@ for product in range(1, 23):
     except:
         print("Unable to do forecast, some Error raised!")
         pass
-
-
