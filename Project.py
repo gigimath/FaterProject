@@ -77,6 +77,15 @@ def plotting_data(dataframe):
     plt.show()
 
 
+def plotting(dataframe, prod_num):
+    fig, axs = plt.subplots(2, sharex=True)
+    axs[0].plot(dataframe['STU'])
+    axs[1].plot(dataframe['STU'].diff().dropna())
+    axs[0].set_title("Time Series of Product" + f"_{prod_num}")
+    axs[1].set_title("Differenced Time Series of Product" + f"_{prod_num}")
+    plt.savefig("Time Series of Product" + f"_{prod_num}" + ".pdf")
+
+
 def plotting_autocorr(dataframe):
     plot_acf(dataframe['STU'].iloc[1:], lags=40)
     plt.show()
@@ -89,7 +98,6 @@ def plotting_part_autocorr(dataframe):
 
 def splitting_df(dataframe):
     dataframe = dataframe.dropna()
-    # dataframe = dataframe.reset_index()
     index = 100
     train_set = dataframe.iloc[:index]
     test_set = dataframe.iloc[index:]
@@ -110,13 +118,8 @@ def rolling_forecast_ARIMA(train, test, p, d, q):
         predictions.append(yhat)
         obs = test[t]
         history.append(obs)
-        #print(f"predicted: {yhat} -- observed: {obs}")
     error = mean_squared_error(test, predictions)
     return error
-    # print(f"Test MSE: {error}")
-    # plt.plot(test)
-    # plt.plot(predictions, color="red")
-    # plt.show()
 
 
 def forecast_ARIMA(train, test, p, d, q, model_selection, prod_num):
@@ -126,7 +129,6 @@ def forecast_ARIMA(train, test, p, d, q, model_selection, prod_num):
     model_fit = model.fit(disp=0)
     if model_selection:
         forecast, st_errs, conf_int = model_fit.forecast(len(test), alpha=0.05)
-        forecast_series = pd.Series(forecast, index=test.index)
     else:
         predictions_range = pd.date_range('2019-04-01', '2019-09-29', freq="W-MON").to_series()
 
@@ -136,7 +138,7 @@ def forecast_ARIMA(train, test, p, d, q, model_selection, prod_num):
         df_predictions['Sales_Prediction'] = forecast
         df_predictions['Week'] = pd.to_datetime(df_predictions["Week"])
         df_predictions.set_index("Week", inplace=True)
-        #print(df_predictions)
+
 
         plt.figure(figsize=(12, 5))
         plt.plot(train['STU'], label='training')
@@ -144,29 +146,10 @@ def forecast_ARIMA(train, test, p, d, q, model_selection, prod_num):
         plt.title('Forecast vs Actuals')
         plt.legend(loc='upper left', fontsize=8)
         plt.savefig("Product" + f"_{prod_num}" + ".pdf")
-
-
-    """plt.figure(figsize=(12, 5), dpi=100)
-    plt.plot(train['STU'], label='training')
-    plt.plot(test['STU'], label='actual')
-    plt.plot(forecast_series, label='forecast')
-    plt.title('Forecast vs Actuals')
-    plt.legend(loc='upper left', fontsize=8)
-    plt.show()"""
     if model_selection:
         MSE = mean_squared_error(test, forecast)
         return MSE
     return df_predictions
-
-
-def ARIMA_predictions(sales):
-    model = ARIMA(sales, order=(1, 1, 0))
-    model_fit = model.fit(disp=0)
-    predictions = model_fit.predict(start=90, end=116, typ='linear', dynamic=True)           # End must be the length of test-set
-    plt.plot(sales)
-    plt.plot(predictions, color="red")
-    plt.show()
-    print(f"Test MSE: {mean_squared_error(predictions, sales[89:])}")
 
 
 def ARIMA_model_selection(value):
@@ -204,7 +187,6 @@ def best_prediction(train, test, differenced, prod_num):
                     p_value = p
                     q_value = q
                     best_MSE = MSE
-                #print(f"p_value: {p}, q_value: {q}, Test MSE: {MSE}")
             except:
                 pass
     #if best_MSE == MSE_target:
@@ -224,25 +206,16 @@ for product in range(1, 23):
     diff = False
 
     if not stationarity_test(df_clean, differenced=False):      # Stationarity test before differencing
-        #df_clean = differencing(df_clean)
         diff = True
         #stationarity_test(df_clean.dropna(), differenced=True)  # Stationarity test after differencing"""
 
-
-
-    #plotting_data(df_clean)         # Plotting the series after differencing
 
 
     #plotting_autocorr(df_clean)                 # Used for finding q in MA(q)
     #plotting_part_autocorr(df_clean)            # Used for finding p in AR(p)
 
     training_set, test_set, df_clean = splitting_df(df_clean)
-
-    #print(df_clean.head(), df_clean.info())
-    #print(training_set.tail(), training_set.info())
-    #print(test_set.tail(), test_set.info())
-    #forecast_ARIMA(training_set, test_set, 1, 0, 1)
-    #ARIMA_model_selection(df_clean['STU'])
+    plotting(df_clean, product)
 
     p, q, d = best_prediction(training_set, test_set, diff, product)
 
@@ -254,36 +227,3 @@ for product in range(1, 23):
         pass
 
 
-
-#ARIMA_predictions(df_clean['STU'])
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-model = ARIMA(training_set, order=(2,1,1))
-#model = ARIMA(df_clean['Sales after differencing'].dropna(), order=(2,1,1))
-model_fit = model.fit()
-
-print(model_fit.summary())
-df_clean['Forecast'] = model_fit.predict(start=80, typ='levels', dynamic=True)
-df_clean[['Sales after differencing', 'Forecast']].plot(figsize=(12,8))
-plt.show()
-"""
-
-"""
-residuals = pd.DataFrame(model_fit.resid)
-residuals.plot()
-plt.show()
-residuals.plot(kind='kde')
-plt.show()
-print(residuals.describe())
-"""
