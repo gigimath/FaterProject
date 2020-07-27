@@ -196,7 +196,7 @@ def best_prediction(train, test, differenced, prod_num):
 
 
 # -------- STARTING MAIN -----------
-dataset = pd.read_excel(r"C:\Users\Enrico\Google Drive\DATA MINING\CHALLENGE FATER\serie_tamponi.xlsx")
+dataset = pd.read_excel("serie_tamponi.xlsx")
 df = dataset.copy()                     # Copy the original dataset in a new identical one
 
 
